@@ -24,7 +24,7 @@ func Example() {
 
 		m.Handle(lscmd)
 	})
-	m.Run(ctx)
+	cli.Run(ctx, m)
 }
 
 type rootCmd struct {

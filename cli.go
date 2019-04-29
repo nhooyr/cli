@@ -69,7 +69,7 @@ func (m *Mux) Handle(cmd Command) {
 }
 
 // Run starts the CLI.
-func (m *Mux) Run(ctx context.Context) {
+func Run(ctx context.Context, m *Mux) {
 	if m.subs == nil && m.leaf == nil {
 		panicf("no command registered")
 	}

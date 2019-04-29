@@ -11,79 +11,90 @@ import (
 	"text/tabwriter"
 )
 
-type Spec struct {
-	Usage string
-	Desc  string
-	Flags flag.FlagSet
+// CommandHelp describes the help of a command.
+type CommandHelp interface {
+	Name() string
+	Usage() string
+	Desc() string
+	Flags(f *flag.FlagSet)
 }
 
-type ParentCommand interface {
-	Spec() Spec
-}
-
+// Command represents a command that can be invoked.
 type Command interface {
+	CommandHelp
 	Run(ctx context.Context, args []string) int
-	Spec() Spec
 }
 
-// Mux is a router for your CLI.
-type Mux struct{}
+// Mux is responsible for setting up the routing tree.
+type Mux struct {
+	leaf Command
 
-func (m Mux) Handle(name string, cmd Command) {
-
+	spec CommandHelp
+	subs map[string]*Mux
 }
 
-func (m Mux) Sub(name string, pcmd ParentCommand, fn func(m Mux)) {
-
-}
-
-func Run(ctx context.Context, m Mux) {
-
-}
-
-func (subcmds Mux) Run(ctx context.Context, args []string) int {
-	if len(args) < 1 {
-		log.Printf("please provide a subcommand")
-		return Help(ctx)
+// Sub registers a parent command with a sub commands as registered by fn.
+func (m *Mux) Sub(spec CommandHelp, fn func(m *Mux)) {
+	_, ok := m.subs[spec.Name()]
+	if ok {
+		panicf("%v is already registered by another command", spec.Name())
 	}
 
-	for _, subspec := range subcmds {
-		if subspec.Name == args[0] {
-			return run(ctx, args[1:], subspec)
-		}
+	m2 := &Mux{
+		spec: spec,
 	}
 
-	log.Printf("unknown subcommand: %q", args[0])
-	return Help(ctx)
+	if m.subs == nil {
+		m.subs = make(map[string]*Mux)
+	}
+	m.subs[spec.Name()] = m2
+
+	fn(m2)
 }
 
-// Version represents the git tag/revision for this build./
-// Please set this as you see fit.
-// I would recommend a go generated version file or injecting
-// the value into go build.
-var Version = "<dev>"
+// Handle registers the command.
+func (m *Mux) Handle(cmd Command) {
+	_, ok := m.subs[cmd.Name()]
+	if ok {
+		panicf("%v is already registered by another command", cmd.Name())
+	}
 
-// Help prints the usage for the selected command.
-// The passed context should be derived from the context
-// passed to the handler.
-func Help(ctx context.Context) int {
-	ctx.Value("usage").(func())()
-	return 1
+	if m.subs == nil {
+		m.subs = make(map[string]*Mux)
+	}
+	m.subs[cmd.Name()] = &Mux{
+		spec: cmd,
+		leaf: cmd,
+	}
 }
 
-// Run begins the CLI with the given root command.
-func Run(ctx context.Context, cmd Command) {
-	ctx = context.WithValue(ctx, "fullname", os.Args[0])
-	status := run(ctx, os.Args[1:], cmd)
+// Run starts the CLI.
+func (m *Mux) Run(ctx context.Context) {
+	if m.subs == nil && m.leaf == nil {
+		panicf("no command registered")
+	}
+	if len(m.subs) > 1 {
+		panicf("cannot register multiple commands on root")
+	}
+
+	rootCmd, ok := m.subs[os.Args[0]]
+	if !ok {
+		panicf("root cmd must be registered on os.Args[0]")
+	}
+
+	ctx = context.WithValue(ctx, "fullname", rootCmd.spec.Name())
+	status := run(ctx, os.Args[1:], rootCmd)
 	os.Exit(status)
 }
 
-func run(ctx context.Context, args []string, spec Command) int {
+func run(ctx context.Context, args []string, cmd *Mux) int {
 	fullname := ctx.Value("fullname").(string)
-	f := initFlagSet(fullname, spec)
+	f := initFlagSet(fullname, cmd)
+
+	ctx = context.WithValue(ctx, "usage", f.Usage)
 
 	version := new(bool)
-	if fullname == spec.Name {
+	if fullname == cmd.spec.Name() {
 		version = f.Bool("version", false, "Print version and exit.")
 	}
 
@@ -97,42 +108,56 @@ func run(ctx context.Context, args []string, spec Command) int {
 		return 0
 	}
 
-	ctx = context.WithValue(ctx, "usage", f.Usage)
-	ctx = context.WithValue(ctx, "fullname", fullname)
-	return spec.Handler.Run(ctx, f.Args())
+	if cmd.leaf != nil {
+		return cmd.leaf.Run(ctx, f.Args())
+	}
+
+	if len(args) < 1 {
+		log.Printf("please provide a subcommand")
+		return Help(ctx)
+	}
+
+	subcmd, ok := cmd.subs[f.Arg(0)]
+	if !ok {
+		log.Printf("unknown subcommand: %q", args[0])
+		return Help(ctx)
+	}
+
+	ctx = context.WithValue(ctx, "fullname", fullname+" "+subcmd.spec.Name())
+	return run(ctx, args[1:], subcmd)
 }
 
-func initFlagSet(fullname string, spec Command) *flag.FlagSet {
-	spec.Flags.Init(fullname, flag.ContinueOnError)
+func initFlagSet(fullname string, cmd *Mux) *flag.FlagSet {
+	f := flag.NewFlagSet(fullname, flag.ContinueOnError)
+	cmd.spec.Flags(f)
 
-	spec.Flags.Usage = func() {
+	f.Usage = func() {
 		var b bytes.Buffer
 
-		fmt.Fprintf(&b, "usage: %v %v\n", fullname, spec.Usage)
+		fmt.Fprintf(&b, "usage: %v %v\n", fullname, cmd.spec.Usage())
 		fmt.Fprintf(&b, "version: %v\n", Version)
 
-		if spec.Desc != "" {
-			fmt.Fprintf(&b, "\n%v\n", spec.Desc)
+		if cmd.spec.Desc() != "" {
+			fmt.Fprintf(&b, "\n%v\n", cmd.spec.Desc())
 		}
 
 		var flagsCount int
-		spec.Flags.VisitAll(func(_ *flag.Flag) {
+		f.VisitAll(func(_ *flag.Flag) {
 			flagsCount++
 		})
 		if flagsCount > 0 {
 			fmt.Fprintf(&b, "\nflags:\n")
-			spec.Flags.SetOutput(&b)
-			spec.Flags.PrintDefaults()
+			f.SetOutput(&b)
+			f.PrintDefaults()
 		}
 
-		subcmds, ok := spec.Handler.(Mux)
-		if ok {
+		if len(cmd.subs) > 0 {
 			fmt.Fprintf(&b, "\nsubcommands:\n")
 
 			tw := tabwriter.NewWriter(&b, 0, 0, 4, ' ', 0)
-			for _, subcmd := range subcmds {
-				fmt.Fprintf(tw, "  %v %v", subcmd.Name, subcmd.Usage)
-				summary := strings.Split(subcmd.Desc, "\n")[0]
+			for _, subcmd := range cmd.subs {
+				fmt.Fprintf(tw, "  %v %v", subcmd.spec.Name(), subcmd.spec.Usage())
+				summary := strings.Split(subcmd.spec.Desc(), "\n")[0]
 				if summary != "" {
 					fmt.Fprintf(tw, "\t%v", summary)
 				}
@@ -147,5 +172,23 @@ func initFlagSet(fullname string, spec Command) *flag.FlagSet {
 		os.Stderr.Write(b.Bytes())
 	}
 
-	return &spec.Flags
+	return f
+}
+
+func panicf(f string, v ...interface{}) {
+	panic(fmt.Sprintf("cli: "+f, v...))
+}
+
+// Version represents the git tag/revision for this build./
+// Please set this as you see fit.
+// I would recommend a go generated version file or injecting
+// the value into go build.
+var Version = "<dev>"
+
+// Help prints the usage for the selected command.
+// The passed context should be derived from the context
+// passed to the handler.
+func Help(ctx context.Context) int {
+	ctx.Value("usage").(func())()
+	return 1
 }

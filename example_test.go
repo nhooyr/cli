@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"context"
+	"flag"
 	"golang.org/x/xerrors"
 	"log"
 	"nhooyr.io/cli"
@@ -10,27 +11,40 @@ import (
 	"time"
 )
 
+func Example() {
+	log.SetFlags(0)
+	ctx := context.Background()
+	var m cli.Mux
+
+	rootCmd := &rootCmd{}
+	m.Sub(rootCmd, func(m *cli.Mux) {
+		lscmd := &lsCmd{
+			rootCmd: rootCmd,
+		}
+
+		m.Handle(lscmd)
+	})
+	m.Run(ctx)
+}
+
 type rootCmd struct {
 	status int
 }
 
-func (rootCmd *rootCmd) Spec() cli.Command {
-	s := cli.Command{
-		Name:  os.Args[0],
-		Usage: "[-fail] <SUBCMD>",
-		Desc:  "my awesome description.",
-		Subcommands: []cli.Handler{
-			&lsCmd{
-				rootCmd: rootCmd,
-			},
-		},
-	}
-	s.Flags.IntVar(&rootCmd.status, "fail", 0, "exit with given status")
-	return s
+func (rootCmd *rootCmd) Name() string {
+	return os.Args[0]
 }
 
-func (rootCmd *rootCmd) Run(args []string) int {
-	return rootCmd.status
+func (rootCmd *rootCmd) Usage() string {
+	return "[-fail] <subcmd>"
+}
+
+func (rootCmd *rootCmd) Desc() string {
+	return "my awesome description."
+}
+
+func (rootCmd *rootCmd) Flags(f *flag.FlagSet) {
+	f.IntVar(&rootCmd.status, "fail", 0, "exit with given status")
 }
 
 type lsCmd struct {
@@ -38,20 +52,25 @@ type lsCmd struct {
 	long    bool
 }
 
-func (lsCmd *lsCmd) Spec() cli.Command {
-	s := cli.Command{
-		Name:  "ls",
-		Usage: "<DIR>",
-		Desc:  "my super awesome desc",
-	}
-	s.Flags.BoolVar(&lsCmd.long, "l", false, "long declaration")
-	return s
+func (lsCmd *lsCmd) Name() string {
+	return "ls"
 }
 
-func (lsCmd *lsCmd) Run(args []string) int {
+func (lsCmd *lsCmd) Usage() string {
+	return "<dir>"
+}
+func (lsCmd *lsCmd) Desc() string {
+	return "my super awesome desc."
+}
+
+func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
+	f.BoolVar(&lsCmd.long, "l", false, "long declaration")
+}
+
+func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {
 	if len(args) != 1 {
 		log.Println("you must provide a single argument")
-		return cli.Help()
+		return cli.Help(ctx)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -73,7 +92,7 @@ func (lsCmd *lsCmd) Run(args []string) int {
 
 	err = ls.Wait()
 	if err != nil {
-		var cerr *exec.ExitError
+		cerr := &exec.ExitError{}
 		if !xerrors.As(err, &cerr) {
 			log.Println("failed to wait for %q: %v", ls.Args, err)
 			return 1
@@ -81,9 +100,4 @@ func (lsCmd *lsCmd) Run(args []string) int {
 	}
 
 	return 0
-}
-
-func Example() {
-	log.SetFlags(0)
-	cli.Run(&rootCmd{})
 }

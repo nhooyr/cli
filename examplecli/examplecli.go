@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"golang.org/x/xerrors"
 	"log"
 	"nhooyr.io/cli"
@@ -12,29 +13,38 @@ import (
 
 func main() {
 	log.SetFlags(0)
-
-	r := &rootCmd{}
-
+	ctx := context.Background()
 	var m cli.Mux
-	m.Sub(os.Args[0], r, func(m cli.Mux) {
-		m.Handle("ls", &lsCmd{
-			rootCmd: r,
-		})
-		// .. other subcommands would be defined in a similar manner.
+
+	rootCmd := &rootCmd{}
+	m.Sub(rootCmd, func(m *cli.Mux) {
+		lscmd := &lsCmd{
+			rootCmd: rootCmd,
+		}
+
+		m.Handle(lscmd)
 	})
+	m.Run(ctx)
 }
 
 type rootCmd struct {
 	status int
 }
 
-func (rootCmd *rootCmd) Spec() cli.Spec {
-	spec := cli.Spec{
-		Usage: "[-fail] <SUBCMD>",
-		Desc:  "my awesome description.",
-	}
-	spec.Flags.IntVar(&rootCmd.status, "fail", 0, "exit with given status")
-	return spec
+func (rootCmd *rootCmd) Name() string {
+	return os.Args[0]
+}
+
+func (rootCmd *rootCmd) Usage() string {
+	return "[-fail] <subcmd>"
+}
+
+func (rootCmd *rootCmd) Desc() string {
+	return "my awesome description."
+}
+
+func (rootCmd *rootCmd) Flags(f *flag.FlagSet) {
+	f.IntVar(&rootCmd.status, "fail", 0, "exit with given status")
 }
 
 type lsCmd struct {
@@ -42,13 +52,19 @@ type lsCmd struct {
 	long    bool
 }
 
-func (lsCmd *lsCmd) Spec() cli.Spec {
-	s := cli.Spec{
-		Usage: "<DIR>",
-		Desc:  "my super awesome desc",
-	}
-	s.Flags.BoolVar(&lsCmd.long, "l", false, "long declaration")
-	return s
+func (lsCmd *lsCmd) Name() string {
+	return "ls"
+}
+
+func (lsCmd *lsCmd) Usage() string {
+	return "<dir>"
+}
+func (lsCmd *lsCmd) Desc() string {
+	return "my super awesome desc."
+}
+
+func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
+	f.BoolVar(&lsCmd.long, "l", false, "long declaration")
 }
 
 func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {

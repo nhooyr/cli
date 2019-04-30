@@ -130,7 +130,10 @@ func run(ctx context.Context, args []string, cmd *Mux) int {
 func usage(cmd *Mux) string {
 	usage := cmd.spec.Usage()
 	if len(cmd.subs) > 0 {
-		usage += " <subcmd>"
+		if usage != "" {
+			usage += " "
+		}
+		usage += "<subcmd>"
 	}
 	return usage
 }

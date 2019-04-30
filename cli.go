@@ -103,7 +103,7 @@ func run(ctx context.Context, args []string, cmd *Mux) int {
 		return 1
 	}
 
-	if *version || f.Arg(0) == "--version" || f.Arg(0) == "-version" {
+	if *version {
 		os.Stdout.WriteString(Version + "\n")
 		return 0
 	}

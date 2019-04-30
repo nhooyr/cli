@@ -127,6 +127,14 @@ func run(ctx context.Context, args []string, cmd *Mux) int {
 	return run(ctx, args[1:], subcmd)
 }
 
+func usage(cmd *Mux) string {
+	usage := cmd.spec.Usage()
+	if len(cmd.subs) > 0 {
+		usage += " <subcmd>"
+	}
+	return usage
+}
+
 func initFlagSet(fullname string, cmd *Mux) *flag.FlagSet {
 	f := flag.NewFlagSet(fullname, flag.ContinueOnError)
 	cmd.spec.Flags(f)
@@ -134,7 +142,7 @@ func initFlagSet(fullname string, cmd *Mux) *flag.FlagSet {
 	f.Usage = func() {
 		var b bytes.Buffer
 
-		fmt.Fprintf(&b, "usage: %v %v\n", fullname, cmd.spec.Usage())
+		fmt.Fprintf(&b, "usage: %v %v\n", fullname, usage(cmd))
 		fmt.Fprintf(&b, "version: %v\n", Version)
 
 		if cmd.spec.Desc() != "" {
@@ -156,7 +164,7 @@ func initFlagSet(fullname string, cmd *Mux) *flag.FlagSet {
 
 			tw := tabwriter.NewWriter(&b, 0, 0, 4, ' ', 0)
 			for _, subcmd := range cmd.subs {
-				fmt.Fprintf(tw, "  %v %v", subcmd.spec.Name(), subcmd.spec.Usage())
+				fmt.Fprintf(tw, "  %v %v", subcmd.spec.Name(), usage(subcmd))
 				summary := strings.Split(subcmd.spec.Desc(), "\n")[0]
 				if summary != "" {
 					fmt.Fprintf(tw, "\t%v", summary)

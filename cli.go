@@ -77,10 +77,8 @@ func Run(ctx context.Context, m Mux) {
 		panicf("cannot register multiple commands on root")
 	}
 
-	rootCmd, ok := m.subs[os.Args[0]]
-	if !ok {
-		panicf("root cmd must be registered on os.Args[0]")
-	}
+	var rootCmd *Mux
+	for _, rootCmd = range m.subs {}
 
 	ctx = context.WithValue(ctx, "fullname", rootCmd.spec.Name())
 	status := run(ctx, os.Args[1:], rootCmd)

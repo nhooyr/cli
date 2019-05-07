@@ -32,7 +32,7 @@ type rootCmd struct {
 }
 
 func (rootCmd *rootCmd) Name() string {
-	return os.Args[0]
+	return "examplecli"
 }
 
 func (rootCmd *rootCmd) Usage() string {

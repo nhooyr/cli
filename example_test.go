@@ -50,7 +50,7 @@ func (lsCmd *lsCmd) Name() string {
 	return "ls"
 }
 
-func (lsCmd *lsCmd) Usage() string {
+func (lsCmd *lsCmd) ArgsHelp() string {
 	return "<dir>"
 }
 func (lsCmd *lsCmd) Desc() string {

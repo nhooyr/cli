@@ -29,8 +29,8 @@ func (rootCmd *rootCmd) Name() string {
 	return "examplecli"
 }
 
-func (rootCmd *rootCmd) Usage() string {
-	return "[-fail] <subcmd>"
+func (rootCmd *rootCmd) ArgsHelp() string {
+	return ""
 }
 
 func (rootCmd *rootCmd) Desc() string {
@@ -65,7 +65,7 @@ func (lsCmd *lsCmd) Name() string {
 	return lsCmd.name
 }
 
-func (lsCmd *lsCmd) Usage() string {
+func (lsCmd *lsCmd) ArgsHelp() string {
 	return "<dir>"
 }
 

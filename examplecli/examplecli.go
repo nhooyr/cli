@@ -3,34 +3,32 @@ package main
 import (
 	"context"
 	"flag"
-	"golang.org/x/xerrors"
 	"log"
-	"nhooyr.io/cli"
 	"os"
 	"os/exec"
 	"time"
+
+	"golang.org/x/xerrors"
+
+	"nhooyr.io/cli"
 )
 
 func main() {
 	log.SetFlags(0)
 	ctx := context.Background()
-	var m cli.Tree
-
-	rootCmd := &rootCmd{}
-	m.Branch(rootCmd)
-	cli.Run(ctx, m)
+	cli.Run(ctx, &rootCmd{})
 }
 
 type rootCmd struct {
-	status int
+	fail int
 }
 
 func (rootCmd *rootCmd) Name() string {
 	return "examplecli"
 }
 
-func (rootCmd *rootCmd) ArgsHelp() string {
-	return ""
+func (rootCmd *rootCmd) Usage() string {
+	panic("unreachable")
 }
 
 func (rootCmd *rootCmd) Desc() string {
@@ -38,34 +36,31 @@ func (rootCmd *rootCmd) Desc() string {
 }
 
 func (rootCmd *rootCmd) Flags(f *flag.FlagSet) {
-	f.IntVar(&rootCmd.status, "fail", 0, "Exit with given status.")
+	f.IntVar(&rootCmd.fail, "fail", -1, "Exit with given status.")
 }
 
-func (rootCmd *rootCmd) Branch(t cli.Tree) {
-	lscmd := &lsCmd{
-		name:    "install-for-chrome-ext",
-		rootCmd: rootCmd,
+func (rootCmd *rootCmd) Subcommands() []cli.Command {
+	return []cli.Command{
+		&lsCmd{
+			rootCmd: rootCmd,
+		},
 	}
-	lscmd2 := &lsCmd{
-		name:    "ls",
-		rootCmd: rootCmd,
-	}
+}
 
-	t.Leaf(lscmd)
-	t.Leaf(lscmd2)
+func (rootCmd *rootCmd) Run(ctx context.Context, args []string) int {
+	panic("unreachable")
 }
 
 type lsCmd struct {
-	name    string
 	rootCmd *rootCmd
 	long    bool
 }
 
 func (lsCmd *lsCmd) Name() string {
-	return lsCmd.name
+	return "ls"
 }
 
-func (lsCmd *lsCmd) ArgsHelp() string {
+func (lsCmd *lsCmd) Usage() string {
 	return "<dir>"
 }
 
@@ -74,16 +69,19 @@ func (lsCmd *lsCmd) Desc() string {
 }
 
 func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
-	if lsCmd.name != "ls" {
-		return
-	}
-	f.BoolVar(&lsCmd.long, "l", false, "Long listing.")
+	f.BoolVar(&lsCmd.long, "l", false, "Use long format.")
+}
+
+func (lsCmd *lsCmd) Subcommands() []cli.Command {
+	return nil
 }
 
 func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {
+	if lsCmd.rootCmd.fail != -1 {
+		return lsCmd.rootCmd.fail
+	}
 	if len(args) != 1 {
-		log.Println("you must provide a single argument")
-		return cli.Help(ctx)
+		return cli.Helpf(ctx, "directory required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -99,7 +97,7 @@ func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {
 	ls.Stderr = os.Stderr
 	err := ls.Start()
 	if err != nil {
-		log.Println("failed to run %q: %v", ls.Args, err)
+		log.Printf("failed to run %q: %v", ls.Args, err)
 		return 1
 	}
 
@@ -107,7 +105,7 @@ func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {
 	if err != nil {
 		cerr := &exec.ExitError{}
 		if !xerrors.As(err, &cerr) {
-			log.Println("failed to wait for %q: %v", ls.Args, err)
+			log.Printf("failed to wait for %q: %v", ls.Args, err)
 			return 1
 		}
 	}

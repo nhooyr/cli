@@ -23,12 +23,10 @@ type rootCmd struct {
 	fail int
 }
 
+var _ cli.Branch = &rootCmd{}
+
 func (rootCmd *rootCmd) Name() string {
 	return "examplecli"
-}
-
-func (rootCmd *rootCmd) Usage() string {
-	panic("unreachable")
 }
 
 func (rootCmd *rootCmd) Desc() string {
@@ -47,14 +45,12 @@ func (rootCmd *rootCmd) Subcommands() []cli.Command {
 	}
 }
 
-func (rootCmd *rootCmd) Run(ctx context.Context, args []string) int {
-	panic("unreachable")
-}
-
 type lsCmd struct {
 	rootCmd *rootCmd
 	long    bool
 }
+
+var _ cli.Leaf = &lsCmd{}
 
 func (lsCmd *lsCmd) Name() string {
 	return "ls"
@@ -70,10 +66,6 @@ func (lsCmd *lsCmd) Desc() string {
 
 func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
 	f.BoolVar(&lsCmd.long, "l", false, "Use long format.")
-}
-
-func (lsCmd *lsCmd) Subcommands() []cli.Command {
-	return nil
 }
 
 func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {

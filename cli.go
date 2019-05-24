@@ -18,15 +18,10 @@ import (
 var Version = "<dev>"
 
 // Command represents a CLI command.
+// Any type that implements Command must implement either Leaf or Branch.
 type Command interface {
 	// Name returns the name a user will use to refer to the command.
 	Name() string
-
-	// Usage returns a string that describes the command's args.
-	// Usage will only be called for commands with no subcommands.
-	// A flags field will be added automatically to the usage line so this
-	// method should only return the usage for the command's args.
-	Usage() string
 
 	// Desc returns a description for the command.
 	// The first sentence will be used in the help for
@@ -35,15 +30,28 @@ type Command interface {
 
 	// Flags should register the command's flags on the passed flagset.
 	Flags(f *flag.FlagSet)
+}
 
-	// Subcommands returns the command's subcommands.
-	Subcommands() []Command
+// Leaf represents a command that can be invoked.
+type Leaf interface {
+	Command
+
+	// Usage returns a string that describes the command's args.
+	// A flags field will be added automatically to the usage line when
+	// at least one flag is defined.
+	Usage() string
 
 	// Run is called when the command is invoked.
 	// The returned integer is the status code for the command.
-	// If Subcommands returns at least one command, this will
-	// never be invoked.
 	Run(ctx context.Context, args []string) int
+}
+
+// Branch represents a command that has subcommands.
+type Branch interface {
+	Command
+
+	// Subcommands returns the command's subcommands.
+	Subcommands() []Command
 }
 
 // Helpf prints the msg followed by the help for the
@@ -85,22 +93,26 @@ func run(ctx context.Context, args []string, cmd Command) int {
 		return 0
 	}
 
-	if len(cmd.Subcommands()) == 0 {
+	switch cmd := cmd.(type) {
+	case Leaf:
 		return cmd.Run(ctx, f.Args())
-	}
-
-	if f.NArg() < 1 {
-		return Helpf(ctx, "please provide a subcommand")
-	}
-
-	for _, subcmd := range cmd.Subcommands() {
-		if subcmd.Name() == f.Arg(0) {
-			ctx = context.WithValue(ctx, fullnameKey{}, fullname+" "+subcmd.Name())
-			return run(ctx, f.Args()[1:], subcmd)
+	case Branch:
+		if f.NArg() < 1 {
+			return Helpf(ctx, "please provide a subcommand")
 		}
-	}
 
-	return Helpf(ctx, "unknown subcommand: %q", f.Arg(0))
+		for _, subcmd := range cmd.Subcommands() {
+			if subcmd.Name() == f.Arg(0) {
+				ctx = context.WithValue(ctx, fullnameKey{}, fullname+" "+subcmd.Name())
+				return run(ctx, f.Args()[1:], subcmd)
+			}
+		}
+
+		return Helpf(ctx, "unknown subcommand: %q", f.Arg(0))
+	default:
+		panicf("cmd %T does not implement cli.Leaf or cli.Branch", cmd)
+		panic("unreachable")
+	}
 }
 
 func usage(cmd Command, f *flag.FlagSet) string {
@@ -110,7 +122,7 @@ func usage(cmd Command, f *flag.FlagSet) string {
 		if str == "" {
 			return
 		}
-		
+
 		if usage != "" {
 			usage += " "
 		}
@@ -121,10 +133,11 @@ func usage(cmd Command, f *flag.FlagSet) string {
 		appendUsage("[flags...]")
 	}
 
-	if len(cmd.Subcommands()) > 0 {
-		appendUsage("<subcmd>")
-	} else {
+	switch cmd := cmd.(type) {
+	case Leaf:
 		appendUsage(cmd.Usage())
+	case Branch:
+		appendUsage("<subcmd>")
 	}
 
 	return usage
@@ -161,7 +174,7 @@ func initFlagSet(fullname string, cmd Command) *flag.FlagSet {
 			f.PrintDefaults()
 		}
 
-		if len(cmd.Subcommands()) > 0 {
+		if cmd, ok := cmd.(Branch); ok {
 			fmt.Fprintf(&b, "\nSubcommands:\n")
 
 			tw := tabwriter.NewWriter(&b, 0, 0, 4, ' ', 0)

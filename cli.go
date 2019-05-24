@@ -107,6 +107,10 @@ func usage(cmd Command, f *flag.FlagSet) string {
 	usage := ""
 
 	appendUsage := func(str string) {
+		if str == "" {
+			return
+		}
+		
 		if usage != "" {
 			usage += " "
 		}

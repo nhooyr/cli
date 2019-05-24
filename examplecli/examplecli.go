@@ -14,16 +14,10 @@ import (
 func main() {
 	log.SetFlags(0)
 	ctx := context.Background()
-	var m cli.Mux
+	var m cli.Tree
 
 	rootCmd := &rootCmd{}
-	m.Sub(rootCmd, func(m *cli.Mux) {
-		lscmd := &lsCmd{
-			rootCmd: rootCmd,
-		}
-
-		m.Handle(lscmd)
-	})
+	m.Branch(rootCmd)
 	cli.Run(ctx, m)
 }
 
@@ -40,31 +34,50 @@ func (rootCmd *rootCmd) Usage() string {
 }
 
 func (rootCmd *rootCmd) Desc() string {
-	return "my awesome description."
+	return "My awesome description."
 }
 
 func (rootCmd *rootCmd) Flags(f *flag.FlagSet) {
-	f.IntVar(&rootCmd.status, "fail", 0, "exit with given status")
+	f.IntVar(&rootCmd.status, "fail", 0, "Exit with given status.")
+}
+
+func (rootCmd *rootCmd) Branch(t cli.Tree) {
+	lscmd := &lsCmd{
+		name:    "install-for-chrome-ext",
+		rootCmd: rootCmd,
+	}
+	lscmd2 := &lsCmd{
+		name:    "ls",
+		rootCmd: rootCmd,
+	}
+
+	t.Leaf(lscmd)
+	t.Leaf(lscmd2)
 }
 
 type lsCmd struct {
+	name    string
 	rootCmd *rootCmd
 	long    bool
 }
 
 func (lsCmd *lsCmd) Name() string {
-	return "ls"
+	return lsCmd.name
 }
 
 func (lsCmd *lsCmd) Usage() string {
 	return "<dir>"
 }
+
 func (lsCmd *lsCmd) Desc() string {
-	return "my super awesome desc."
+	return "My super awesome desc."
 }
 
 func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
-	f.BoolVar(&lsCmd.long, "l", false, "long declaration")
+	if lsCmd.name != "ls" {
+		return
+	}
+	f.BoolVar(&lsCmd.long, "l", false, "Long listing.")
 }
 
 func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {

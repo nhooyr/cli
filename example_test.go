@@ -14,16 +14,10 @@ import (
 func Example() {
 	log.SetFlags(0)
 	ctx := context.Background()
-	var m cli.Mux
+	var m cli.Tree
 
 	rootCmd := &rootCmd{}
-	m.Sub(rootCmd, func(m *cli.Mux) {
-		lscmd := &lsCmd{
-			rootCmd: rootCmd,
-		}
-
-		m.Handle(lscmd)
-	})
+	m.Branch(rootCmd)
 	cli.Run(ctx, m)
 }
 

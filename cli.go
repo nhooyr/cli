@@ -23,9 +23,10 @@ type Command interface {
 	// Name returns the name a user will use to refer to the command.
 	Name() string
 
-	// Desc returns a description for the command.
-	// The first sentence will be used in the help for
-	// the parent command so try to make sure its short.
+	// Desc returns the command's description..
+	// If the command name is ls, it might be "Prints directory listings.".
+	// The first sentence will be used in the help of the parent command.
+	// Never include the name of the command in the first sentence.
 	Desc() string
 
 	// Flags should register the command's flags on the passed flagset.
@@ -38,11 +39,12 @@ type Leaf interface {
 
 	// Usage returns a string that describes the command's args.
 	// A flags field will be added automatically to the usage line when
-	// at least one flag is defined.
+	// at least one flag is defined so it should not include any flag fields.
+	// E.g. if the command is ls, it might be "<dir>".
 	Usage() string
 
 	// Run is called when the command is invoked.
-	// The returned integer is the status code for the command.
+	// The returned integer will become the status code for the CLI.
 	Run(ctx context.Context, args []string) int
 }
 
@@ -182,9 +184,8 @@ func initFlagSet(fullname string, cmd Command) *flag.FlagSet {
 				f2 := flag.NewFlagSet(fullname+" "+subcmd.Name(), flag.ContinueOnError)
 				subcmd.Flags(f2)
 				fmt.Fprintf(tw, "  %v\t%v", subcmd.Name(), usage(subcmd, f2))
-				summary := strings.Split(subcmd.Desc(), "\n")[0]
-				if summary != "" {
-					fmt.Fprintf(tw, "\t%v", summary)
+				if subcmd.Desc() != "" {
+					fmt.Fprintf(tw, "\t%v", strings.Split(subcmd.Desc(), "\n")[0])
 				}
 				fmt.Fprintf(tw, "\n")
 			}
@@ -205,6 +206,6 @@ func panicf(f string, v ...interface{}) {
 }
 
 type (
-	usageKey struct{}
+	usageKey    struct{}
 	fullnameKey struct{}
 )

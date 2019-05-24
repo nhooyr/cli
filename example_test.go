@@ -30,11 +30,12 @@ func (rootCmd *rootCmd) Name() string {
 }
 
 func (rootCmd *rootCmd) Desc() string {
-	return "My awesome description."
+	return `Lists a directory.
+Can do other cool things too.`
 }
 
 func (rootCmd *rootCmd) Flags(f *flag.FlagSet) {
-	f.IntVar(&rootCmd.fail, "fail", -1, "Exit with given status.")
+	f.IntVar(&rootCmd.fail, "fail", 0, "Exit with given status.")
 }
 
 func (rootCmd *rootCmd) Subcommands() []cli.Command {
@@ -61,7 +62,8 @@ func (lsCmd *lsCmd) Usage() string {
 }
 
 func (lsCmd *lsCmd) Desc() string {
-	return "My super awesome desc."
+	return `Lists a directory.
+Can do other cool things too.`
 }
 
 func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
@@ -69,7 +71,7 @@ func (lsCmd *lsCmd) Flags(f *flag.FlagSet) {
 }
 
 func (lsCmd *lsCmd) Run(ctx context.Context, args []string) int {
-	if lsCmd.rootCmd.fail != -1 {
+	if lsCmd.rootCmd.fail != 0 {
 		return lsCmd.rootCmd.fail
 	}
 	if len(args) != 1 {

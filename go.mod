@@ -1,4 +1,4 @@
-module nhooyr.io/cli
+module github.com/nhooyr/cli
 
 go 1.12
 
